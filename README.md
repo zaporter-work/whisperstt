@@ -1,6 +1,5 @@
 # whisperstt
 
-This is a go program that captures input from your microphone until you press ESC and uses the "Open"AI API to call Whisper and prints to stdout the return text from the api
 
 Only tested on Linux (Wayland). I highly doubt it works on anything else 
 
