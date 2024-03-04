@@ -1,6 +1,3 @@
-//! Records a WAV file (roughly 3 seconds long) using the default input device and config.
-//!
-//! The input data is recorded to "$CARGO_MANIFEST_DIR/recorded.wav".
 
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -9,6 +6,11 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use reqwest::Client;
+use anyhow::Result;
+use std::env;
+use tokio::fs::File as FuckingTokioFile;
+use tokio::io::AsyncReadExt;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "whisperstt", long_about = None)]
@@ -17,11 +19,43 @@ struct Opt {
     #[arg(short, long, default_value_t = String::from("default"))]
     device: String,
 }
-
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     let opt = Opt::parse();
     let output = record(opt);
+    let recording = transcribe("recorded.wav".into()).await?;
+    println!("{}",recording);
     Ok(())
+}
+async fn transcribe(file_path: PathBuf) -> Result<String> {
+    let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not found in environment");
+
+    let client = Client::new();
+    let url = "https://api.openai.com/v1/audio/transcriptions";
+
+    // Read the file content
+    let mut file = FuckingTokioFile::open(file_path).await?;
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents).await?;
+
+    let form = reqwest::multipart::Form::new()
+        .part("file", reqwest::multipart::Part::bytes(contents).file_name("speech.mp3"))
+        .text("model", "whisper-1")
+        .text("response_format", "text");
+
+    let response = client
+        .post(url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .multipart(form)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let response_text = response.text().await?;
+        Ok(response_text)
+    } else {
+        Err(anyhow::anyhow!("Failed to transcribe audio: {}", response.status()))
+    }
 }
 fn record(opt: Opt) -> Result<PathBuf, anyhow::Error> {
     let host = cpal::default_host();
@@ -93,12 +127,12 @@ fn record(opt: Opt) -> Result<PathBuf, anyhow::Error> {
     stream.play()?;
 
     // Let recording go for roughly three seconds.
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    std::thread::sleep(std::time::Duration::from_secs(5));
+    println!("done");
     drop(stream);
     writer.lock().unwrap().take().unwrap().finalize()?;
     println!("Recording {} complete!", PATH);
     Ok(PATH.into())
-
 }
 
 fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
