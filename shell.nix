@@ -10,11 +10,10 @@ in
         opusTools
         unstable.cargo
         unstable.rustc
+        unstable.rust-analyzer
         alsa-lib
         alsa-utils
-        unstable.rust-analyzer
         vlc
-
     ];
     shellHook = ''
       export PKG_CONFIG_PATH=${pkgs.alsa-lib.dev}/lib/pkgconfig:$PKG_CONFIG_PATH

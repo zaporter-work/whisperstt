@@ -7,6 +7,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample};
 use std::fs::File;
 use std::io::BufWriter;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[derive(Parser, Debug)]
@@ -19,7 +20,10 @@ struct Opt {
 
 fn main() -> Result<(), anyhow::Error> {
     let opt = Opt::parse();
-
+    let output = record(opt);
+    Ok(())
+}
+fn record(opt: Opt) -> Result<PathBuf, anyhow::Error> {
     let host = cpal::default_host();
 
     // Set up the input device and stream with the default input config.
@@ -93,7 +97,8 @@ fn main() -> Result<(), anyhow::Error> {
     drop(stream);
     writer.lock().unwrap().take().unwrap().finalize()?;
     println!("Recording {} complete!", PATH);
-    Ok(())
+    Ok(PATH.into())
+
 }
 
 fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
